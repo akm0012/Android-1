@@ -133,6 +133,14 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
         instanceStateBundles = CombinedInstanceState(originalInstanceState = savedInstanceState, newInstanceState = newInstanceState)
 
         super.onCreate(savedInstanceState = newInstanceState, daggerInject = false)
+
+        if (startedFromClearDataShortcut()) {
+            clearDataAndRestart()
+            overridePendingTransition(0, 0)
+            finish()
+            return
+        }
+
         toolbarMockupBinding = IncludeOmnibarToolbarMockupBinding.bind(binding.root)
         setContentView(binding.root)
         viewModel.viewState.observe(
@@ -168,6 +176,17 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
         } else {
             Timber.i("Automatic data clearer not yet finished, so deferring processing of intent")
             lastIntent = intent
+        }
+    }
+
+    private fun startedFromClearDataShortcut() = intent.getBooleanExtra(PERFORM_FIRE_ON_ENTRY_EXTRA, false)
+
+    private fun clearDataAndRestart() {
+        Timber.i("Clearing everything as a result of $PERFORM_FIRE_ON_ENTRY_EXTRA flag being set")
+        appCoroutineScope.launch {
+            clearPersonalDataAction.clearTabsAndAllDataAsync(appInForeground = true, shouldFireDataClearPixel = true)
+            clearPersonalDataAction.setAppUsedSinceLastClearFlag(false)
+            clearPersonalDataAction.killAndRestartProcess(notifyDataCleared = false)
         }
     }
 
@@ -237,18 +256,6 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
         if (intent.getBooleanExtra(LAUNCH_FROM_DEFAULT_BROWSER_DIALOG, false)) {
             setResult(DefaultBrowserPage.DEFAULT_BROWSER_RESULT_CODE_DIALOG_INTERNAL)
             finish()
-            return
-        }
-
-        if (intent.getBooleanExtra(PERFORM_FIRE_ON_ENTRY_EXTRA, false)) {
-
-            Timber.i("Clearing everything as a result of $PERFORM_FIRE_ON_ENTRY_EXTRA flag being set")
-            appCoroutineScope.launch {
-                clearPersonalDataAction.clearTabsAndAllDataAsync(appInForeground = true, shouldFireDataClearPixel = true)
-                clearPersonalDataAction.setAppUsedSinceLastClearFlag(false)
-                clearPersonalDataAction.killAndRestartProcess(notifyDataCleared = false)
-            }
-
             return
         }
 
